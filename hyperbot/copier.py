@@ -75,15 +75,15 @@ class CopyTradingEngine:
 
         return (
             f"监控地址: {self.settings.leader_address}\n"
-            f"leader账户净值: {leader_value:.4f} U\n"
-            f"leader已用本金(估算): {leader_principal:.4f} U\n"
-            f"leader持仓币种数: {len(leader_positions)}\n"
-            f"leader仓位明细:\n{leader_positions_text}\n"
+            f"监控地址账户净值: {leader_value:.4f} U\n"
+            f"监控地址已用本金(估算): {leader_principal:.4f} U\n"
+            f"监控地址持仓币种数: {len(leader_positions)}\n"
+            f"监控地址仓位明细:\n{leader_positions_text}\n"
             f"跟单地址: {self.settings.follower_address}\n"
-            f"follower账户净值: {follower_value:.4f} U\n"
-            f"follower持仓币种数: {len(follower_positions)}\n"
-            f"follower已用本金(估算): {follower_principal:.4f} U\n"
-            f"follower仓位明细:\n{follower_positions_text}\n"
+            f"跟单地址账户净值: {follower_value:.4f} U\n"
+            f"跟单地址持仓币种数: {len(follower_positions)}\n"
+            f"跟单地址已用本金(估算): {follower_principal:.4f} U\n"
+            f"跟单地址仓位明细:\n{follower_positions_text}\n"
             f"模式: {'DRY_RUN' if self.settings.dry_run else 'LIVE'}"
         )
 
@@ -95,11 +95,15 @@ class CopyTradingEngine:
         rows = []
         for coin in sorted(positions.keys()):
             pos = positions[coin]
+            direction = "做多" if pos.direction == "LONG" else "做空"
+            margin_mode = "全仓" if str(pos.margin_mode).lower() == "cross" else "逐仓"
+            pnl_text = "未知" if pos.unrealized_pnl_usd is None else f"{pos.unrealized_pnl_usd:.4f}U"
+            liq_text = "未知" if pos.liquidation_price is None else f"{pos.liquidation_price:.6f}"
             rows.append(
                 (
-                    f"- {coin} {pos.direction} | mode={pos.margin_mode} | lev={pos.leverage:.2f}x | "
-                    f"notional={abs(pos.notional_usd):.4f}U | principal={pos.principal_usd:.4f}U | "
-                    f"ratio={pos.principal_ratio * 100:.2f}%"
+                    f"- {coin} {direction} | 仓位模式={margin_mode} | 杠杆={pos.leverage:.2f}x | "
+                    f"仓位面额={abs(pos.notional_usd):.4f}U | 本金={pos.principal_usd:.4f}U | "
+                    f"本金占比={pos.principal_ratio * 100:.2f}% | 当前盈亏={pnl_text} | 爆仓价={liq_text}"
                 )
             )
         return "\n".join(rows)

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional
 
 
 class PositionAction(str, Enum):
@@ -18,6 +19,8 @@ class PositionSnapshot:
     leverage: float
     margin_mode: str
     account_value: float
+    unrealized_pnl_usd: Optional[float] = None
+    liquidation_price: Optional[float] = None
 
     @property
     def direction(self) -> str:

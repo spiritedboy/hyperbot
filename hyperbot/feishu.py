@@ -37,16 +37,29 @@ class FeishuNotifier:
 
     def send_leader_signal(self, action: PositionAction, snapshot: PositionSnapshot) -> None:
         ratio_pct = snapshot.principal_ratio * 100
+        action_map = {
+            PositionAction.OPEN: "开仓",
+            PositionAction.ADD: "加仓",
+            PositionAction.REDUCE: "减仓",
+            PositionAction.CLOSE: "清仓",
+            PositionAction.FLIP: "反手",
+        }
+        direction = "做多" if snapshot.direction == "LONG" else "做空"
+        margin_mode = "全仓" if str(snapshot.margin_mode).lower() == "cross" else "逐仓"
+        pnl_text = "未知" if snapshot.unrealized_pnl_usd is None else f"{snapshot.unrealized_pnl_usd:.4f} U"
+        liq_text = "未知" if snapshot.liquidation_price is None else f"{snapshot.liquidation_price:.6f}"
         text = (
-            f"[Leader信号] {action.value.upper()}\n"
+            f"[监控信号] {action_map.get(action, action.value)}\n"
             f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"币种: {snapshot.coin}\n"
-            f"方向: {snapshot.direction}\n"
-            f"开仓类型: {snapshot.margin_mode}\n"
+            f"方向: {direction}\n"
+            f"仓位模式: {margin_mode}\n"
             f"杠杆: {snapshot.leverage:.2f}x\n"
             f"开单本金: {snapshot.principal_usd:.4f} U\n"
             f"本金占总余额: {ratio_pct:.2f}%\n"
-            f"仓位面额: {abs(snapshot.notional_usd):.4f} U"
+            f"仓位面额: {abs(snapshot.notional_usd):.4f} U\n"
+            f"当前盈亏: {pnl_text}\n"
+            f"爆仓价: {liq_text}"
         )
         self.send_text(text)
 
@@ -62,12 +75,21 @@ class FeishuNotifier:
         pnl_usd: Optional[float] = None,
         dry_run: bool = False,
     ) -> None:
+        action_map = {
+            PositionAction.OPEN: "开仓",
+            PositionAction.ADD: "加仓",
+            PositionAction.REDUCE: "减仓",
+            PositionAction.CLOSE: "清仓",
+            PositionAction.FLIP: "反手",
+        }
+        direction_text = "做多" if direction.upper() == "LONG" else "做空"
+        margin_mode_text = "全仓" if str(margin_mode).lower() == "cross" else "逐仓"
         lines = [
-            f"[跟单结果] {action.value.upper()}",
+            f"[跟单结果] {action_map.get(action, action.value)}",
             f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
             f"币种: {coin}",
-            f"方向: {direction}",
-            f"开仓类型: {margin_mode}",
+            f"方向: {direction_text}",
+            f"仓位模式: {margin_mode_text}",
             f"杠杆: {leverage:.2f}x",
             f"跟单本金: {principal_usd:.4f} U",
             f"下单面额: {executed_notional_usd:.4f} U",

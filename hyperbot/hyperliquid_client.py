@@ -56,6 +56,15 @@ class HyperliquidClient:
             if pos.get("marginType"):
                 margin_mode = str(pos["marginType"])
 
+            unrealized_pnl = self._first_float(
+                pos,
+                ["unrealizedPnl", "unrealizedPnlUsd", "uPnl", "upnl"],
+            )
+            liquidation_price = self._first_float(
+                pos,
+                ["liquidationPx", "liquidationPrice", "liqPx"],
+            )
+
             positions[coin] = PositionSnapshot(
                 coin=coin,
                 size=size,
@@ -63,6 +72,8 @@ class HyperliquidClient:
                 leverage=leverage,
                 margin_mode=margin_mode,
                 account_value=account_value,
+                unrealized_pnl_usd=unrealized_pnl,
+                liquidation_price=liquidation_price,
             )
 
         return positions
@@ -147,3 +158,19 @@ class HyperliquidClient:
                 found = True
 
         return total if found else None
+
+    @staticmethod
+    def _first_float(payload: Dict, keys: List[str]) -> Optional[float]:
+        for key in keys:
+            if key not in payload:
+                continue
+            value = payload.get(key)
+            if value is None:
+                continue
+            if isinstance(value, str) and value.strip() == "":
+                continue
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                continue
+        return None
