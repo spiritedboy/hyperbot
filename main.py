@@ -49,8 +49,10 @@ def main() -> None:
         logging.warning(warn_text)
         notifier.send_text(warn_text, title="配置警告")
 
-    notifier.send_text(
-        engine.build_runtime_status_text(),
+    notifier.send_heartbeat_with_links(
+        status_text=engine.build_runtime_status_text(),
+        leader_address=settings.leader_address,
+        follower_address=settings.follower_address,
         title="系统启动",
     )
 
@@ -87,7 +89,12 @@ def main() -> None:
                 return
             time.sleep(settings.heartbeat_seconds)
             try:
-                notifier.send_text(engine.build_runtime_status_text(), title="系统心跳")
+                notifier.send_heartbeat_with_links(
+                    status_text=engine.build_runtime_status_text(),
+                    leader_address=settings.leader_address,
+                    follower_address=settings.follower_address,
+                    title="系统心跳",
+                )
             except Exception as exc:
                 logging.exception("发送心跳失败: %s", exc)
 

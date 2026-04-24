@@ -21,6 +21,48 @@ class FeishuNotifier:
                 "text": full_text,
             },
         }
+        self._send_payload(payload)
+
+    def send_heartbeat_with_links(
+        self,
+        status_text: str,
+        leader_address: str,
+        follower_address: str,
+        title: str = "系统心跳",
+    ) -> None:
+        leader_url = f"https://hyperbot.network/trader/{leader_address}"
+        follower_url = f"https://hyperbot.network/trader/{follower_address}"
+
+        content_lines = [
+            [{"tag": "text", "text": line}] for line in status_text.split("\n")
+        ]
+
+        # 与状态正文分开摆放两个地址链接
+        content_lines.extend(
+            [
+                [{"tag": "text", "text": ""}],
+                [{"tag": "text", "text": "监控地址详情:"}],
+                [{"tag": "a", "text": leader_url, "href": leader_url}],
+                [{"tag": "text", "text": ""}],
+                [{"tag": "text", "text": "跟单地址详情:"}],
+                [{"tag": "a", "text": follower_url, "href": follower_url}],
+            ]
+        )
+
+        payload = {
+            "msg_type": "post",
+            "content": {
+                "post": {
+                    "zh_cn": {
+                        "title": title,
+                        "content": content_lines,
+                    }
+                }
+            },
+        }
+        self._send_payload(payload)
+
+    def _send_payload(self, payload: dict) -> None:
         last_error: Optional[Exception] = None
         for idx in range(3):
             try:
