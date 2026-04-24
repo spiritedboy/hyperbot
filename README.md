@@ -34,8 +34,8 @@ cp .env.example .env
 编辑 `.env`：
 
 - `LEADER_ADDRESS`: 被监控地址
-- `FOLLOWER_PRIVATE_KEY`: 跟单账号私钥
-- `FOLLOWER_ADDRESS`: 跟单账号地址
+- `FOLLOWER_PRIVATE_KEY`: API 钱包私钥（用于签名下单）
+- `FOLLOWER_ADDRESS`: Hyper 主地址（资金和仓位所在账户地址，不是 API 钱包地址）
 - `FEISHU_WEBHOOK`: 飞书机器人 webhook
 - `FIXED_MARGIN_USD`: 固定跟单本金，默认 `20`
 - `WS_RECONNECT_SECONDS`: WebSocket 断线重连间隔秒数
@@ -48,10 +48,51 @@ cp .env.example .env
 - `HEARTBEAT_SECONDS`: 飞书心跳间隔（<=0 关闭）
 - `DRY_RUN`: 建议先 `true` 联调，确认无误后改 `false`
 
+地址填写规则（务必确认）：
+
+- Hyper 主地址：有资产和仓位的主账户地址，用于查询净值和持仓
+- API 钱包地址：代理钱包地址，通常不承载资产
+- API 钱包私钥：仅用于交易签名
+
+对应到配置：
+
+- `FOLLOWER_PRIVATE_KEY` 填 API 钱包私钥
+- `FOLLOWER_ADDRESS` 填 Hyper 主地址
+
+常见错误：
+
+- 如果把 `FOLLOWER_ADDRESS` 误填成 API 钱包地址，系统可能显示余额为 `0`
+- 程序启动时已内置该错误的自动告警（控制台 + 飞书）
+
 ## 3. 启动
 
 ```bash
 python3 main.py
+```
+
+后台长期运行（推荐）：
+
+```bash
+nohup python3 main.py > 1.txt 2>&1 &
+```
+
+说明：
+
+- `2>&1` 表示将错误输出合并到日志文件
+- 若不需要日志可用：`nohup python3 main.py > /dev/null 2>&1 &`
+
+常用命令：
+
+```bash
+# 实时查看日志
+tail -f 1.txt
+
+# 查进程（任选其一）
+pgrep -fa "python3 main.py"
+ps -ef | grep "python3 main.py" | grep -v grep
+
+# 停止进程（先查 PID 再 kill）
+kill <PID>
 ```
 
 启动后会立刻推送一条飞书“系统启动”快照，用于重启自检：

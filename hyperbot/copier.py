@@ -78,7 +78,7 @@ class CopyTradingEngine:
             f"监控地址账户净值: {leader_value:.4f} U\n"
             f"监控地址已用本金(估算): {leader_principal:.4f} U\n"
             f"监控地址持仓币种数: {len(leader_positions)}\n"
-            f"监控地址仓位明细:\n{leader_positions_text}\n"
+            f"监控地址仓位明细:\n{leader_positions_text}\n\n\n"
             f"跟单地址: {self.settings.follower_address}\n"
             f"跟单地址账户净值: {follower_value:.4f} U\n"
             f"跟单地址持仓币种数: {len(follower_positions)}\n"

@@ -2,6 +2,8 @@ import logging
 import threading
 import time
 
+from eth_account import Account
+
 from hyperbot.config import load_settings
 from hyperbot.copier import CopyTradingEngine
 from hyperbot.feishu import FeishuNotifier
@@ -17,6 +19,9 @@ logging.basicConfig(
 
 def main() -> None:
     settings = load_settings()
+
+    api_wallet_address = Account.from_key(settings.follower_private_key).address.lower()
+    follower_address = settings.follower_address.lower()
 
     leader_client = HyperliquidClient(api_url=settings.api_url)
     follower_client = HyperliquidClient(
@@ -34,6 +39,16 @@ def main() -> None:
     )
 
     logging.info("Hyperliquid WS 跟单系统已启动, dry_run=%s", settings.dry_run)
+    if follower_address == api_wallet_address:
+        warn_text = (
+            "检测到 FOLLOWER_ADDRESS 与 API 钱包地址相同。\n"
+            "这通常会导致余额显示为 0，且容易引发账户识别错误。\n"
+            "请将 FOLLOWER_ADDRESS 改为 Hyperliquid 主账户地址，"
+            "FOLLOWER_PRIVATE_KEY 保持为 API 钱包私钥。"
+        )
+        logging.warning(warn_text)
+        notifier.send_text(warn_text, title="配置警告")
+
     notifier.send_text(
         engine.build_runtime_status_text(),
         title="系统启动",
