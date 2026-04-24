@@ -67,16 +67,42 @@ class CopyTradingEngine:
         follower_positions = self.follower_client.get_positions(self.settings.follower_address)
         leader_value = self.leader_client.get_account_value(self.settings.leader_address)
         follower_value = self.follower_client.get_account_value(self.settings.follower_address)
+        leader_principal = self._sum_principal(leader_positions)
         follower_principal = self._sum_principal(follower_positions)
 
+        leader_positions_text = self._format_positions(leader_positions)
+        follower_positions_text = self._format_positions(follower_positions)
+
         return (
+            f"监控地址: {self.settings.leader_address}\n"
             f"leader账户净值: {leader_value:.4f} U\n"
+            f"leader已用本金(估算): {leader_principal:.4f} U\n"
             f"leader持仓币种数: {len(leader_positions)}\n"
+            f"leader仓位明细:\n{leader_positions_text}\n"
+            f"跟单地址: {self.settings.follower_address}\n"
             f"follower账户净值: {follower_value:.4f} U\n"
             f"follower持仓币种数: {len(follower_positions)}\n"
             f"follower已用本金(估算): {follower_principal:.4f} U\n"
+            f"follower仓位明细:\n{follower_positions_text}\n"
             f"模式: {'DRY_RUN' if self.settings.dry_run else 'LIVE'}"
         )
+
+    @staticmethod
+    def _format_positions(positions: Dict[str, PositionSnapshot]) -> str:
+        if not positions:
+            return "- 无持仓"
+
+        rows = []
+        for coin in sorted(positions.keys()):
+            pos = positions[coin]
+            rows.append(
+                (
+                    f"- {coin} {pos.direction} | mode={pos.margin_mode} | lev={pos.leverage:.2f}x | "
+                    f"notional={abs(pos.notional_usd):.4f}U | principal={pos.principal_usd:.4f}U | "
+                    f"ratio={pos.principal_ratio * 100:.2f}%"
+                )
+            )
+        return "\n".join(rows)
 
     def _should_skip_event(self, coin: str, event: ActionEvent, now: float) -> bool:
         debounce = self.settings.event_debounce_seconds
