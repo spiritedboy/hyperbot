@@ -65,8 +65,8 @@ class CopyTradingEngine:
     def build_runtime_status_text(self) -> str:
         leader_positions = self.leader_client.get_positions(self.settings.leader_address)
         follower_positions = self.follower_client.get_positions(self.settings.follower_address)
-        leader_value = self.leader_client.get_account_value(self.settings.leader_address)
-        follower_value = self.follower_client.get_account_value(self.settings.follower_address)
+        leader_perp, leader_spot, leader_value = self.leader_client.get_account_values(self.settings.leader_address)
+        follower_perp, follower_spot, follower_value = self.follower_client.get_account_values(self.settings.follower_address)
         leader_principal = self._sum_principal(leader_positions)
         follower_principal = self._sum_principal(follower_positions)
 
@@ -75,12 +75,16 @@ class CopyTradingEngine:
 
         return (
             f"监控地址: {self.settings.leader_address}\n"
-            f"监控地址账户净值: {leader_value:.4f} U\n"
+            f"监控地址合约净值: {leader_perp:.4f} U\n"
+            f"监控地址现货余额: {leader_spot:.4f} U\n"
+            f"监控地址账户净值(统一账户): {leader_value:.4f} U\n"
             f"监控地址已用本金(估算): {leader_principal:.4f} U\n"
             f"监控地址持仓币种数: {len(leader_positions)}\n"
             f"监控地址仓位明细:\n{leader_positions_text}\n\n\n"
             f"跟单地址: {self.settings.follower_address}\n"
-            f"跟单地址账户净值: {follower_value:.4f} U\n"
+            f"跟单地址合约净值: {follower_perp:.4f} U\n"
+            f"跟单地址现货余额: {follower_spot:.4f} U\n"
+            f"跟单地址账户净值(统一账户): {follower_value:.4f} U\n"
             f"跟单地址持仓币种数: {len(follower_positions)}\n"
             f"跟单地址已用本金(估算): {follower_principal:.4f} U\n"
             f"跟单地址仓位明细:\n{follower_positions_text}\n"

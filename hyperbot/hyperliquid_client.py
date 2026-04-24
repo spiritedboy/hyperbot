@@ -12,6 +12,8 @@ from hyperbot.models import PositionSnapshot
 
 
 class HyperliquidClient:
+    STABLE_COINS = {"USDC", "USDT0", "USDE", "USDH", "USDT"}
+
     def __init__(self, api_url: str, private_key: Optional[str] = None):
         self.info = Info(api_url, skip_ws=True)
         self.exchange: Optional[Exchange] = None
@@ -20,13 +22,37 @@ class HyperliquidClient:
             self.exchange = Exchange(wallet, api_url)
 
     def get_account_value(self, address: str) -> float:
+        _, _, total_value = self.get_account_values(address)
+        return total_value
+
+    def get_account_values(self, address: str) -> tuple[float, float, float]:
+        perp_value = self.get_perp_account_value(address)
+        spot_value = self.get_spot_account_value(address)
+        return perp_value, spot_value, perp_value + spot_value
+
+    def get_perp_account_value(self, address: str) -> float:
         state = self.info.user_state(address)
         margin = state.get("marginSummary", {})
         return float(margin.get("accountValue", 0.0))
 
+    def get_spot_account_value(self, address: str) -> float:
+        try:
+            state = self.info.post("/info", {"type": "spotClearinghouseState", "user": address})
+        except Exception:
+            return 0.0
+
+        balances = state.get("balances", []) if isinstance(state, dict) else []
+        total = 0.0
+        for bal in balances:
+            coin = str(bal.get("coin", "")).upper()
+            if coin not in self.STABLE_COINS:
+                continue
+            total += float(bal.get("total", 0.0))
+        return total
+
     def get_positions(self, address: str) -> Dict[str, PositionSnapshot]:
         state = self.info.user_state(address)
-        account_value = float(state.get("marginSummary", {}).get("accountValue", 0.0))
+        _, _, account_value = self.get_account_values(address)
         positions: Dict[str, PositionSnapshot] = {}
 
         for item in state.get("assetPositions", []):
