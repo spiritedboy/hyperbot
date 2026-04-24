@@ -39,7 +39,7 @@ class FeishuNotifier:
                 content_lines.append(
                     [
                         {"tag": "text", "text": "监控地址: "},
-                        {"tag": "a", "text": leader_address, "href": leader_url},
+                        {"tag": "a", "text": "点击查看", "href": leader_url},
                     ]
                 )
                 continue
@@ -48,7 +48,7 @@ class FeishuNotifier:
                 content_lines.append(
                     [
                         {"tag": "text", "text": "跟单地址: "},
-                        {"tag": "a", "text": follower_address, "href": follower_url},
+                        {"tag": "a", "text": "点击查看", "href": follower_url},
                     ]
                 )
                 continue
