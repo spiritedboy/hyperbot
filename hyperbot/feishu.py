@@ -33,21 +33,27 @@ class FeishuNotifier:
         leader_url = f"https://hyperbot.network/trader/{leader_address}"
         follower_url = f"https://hyperbot.network/trader/{follower_address}"
 
-        content_lines = [
-            [{"tag": "text", "text": line}] for line in status_text.split("\n")
-        ]
+        content_lines = []
+        for line in status_text.split("\n"):
+            if line.startswith("监控地址: "):
+                content_lines.append(
+                    [
+                        {"tag": "text", "text": "监控地址: "},
+                        {"tag": "a", "text": leader_address, "href": leader_url},
+                    ]
+                )
+                continue
 
-        # 与状态正文分开摆放两个地址链接
-        content_lines.extend(
-            [
-                [{"tag": "text", "text": ""}],
-                [{"tag": "text", "text": "监控地址详情:"}],
-                [{"tag": "a", "text": leader_url, "href": leader_url}],
-                [{"tag": "text", "text": ""}],
-                [{"tag": "text", "text": "跟单地址详情:"}],
-                [{"tag": "a", "text": follower_url, "href": follower_url}],
-            ]
-        )
+            if line.startswith("跟单地址: "):
+                content_lines.append(
+                    [
+                        {"tag": "text", "text": "跟单地址: "},
+                        {"tag": "a", "text": follower_address, "href": follower_url},
+                    ]
+                )
+                continue
+
+            content_lines.append([{"tag": "text", "text": line}])
 
         payload = {
             "msg_type": "post",
