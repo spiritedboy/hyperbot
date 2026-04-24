@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from decimal import Decimal, ROUND_DOWN
 from typing import Dict, List, Optional
 
 from eth_account import Account
@@ -133,8 +134,11 @@ class HyperliquidClient:
             raise ValueError(f"{coin} 价格异常")
 
         sz = notional_usd / px
+        sz = self._normalize_size(coin, sz)
         if sz <= 0:
             raise ValueError("下单数量不能为0")
+
+        limit_px = self._normalize_price(coin, px * (1 + slippage if is_buy else 1 - slippage))
 
         if dry_run:
             return {
@@ -145,6 +149,7 @@ class HyperliquidClient:
                     "is_buy": is_buy,
                     "notional_usd": notional_usd,
                     "size": sz,
+                    "limit_px": limit_px,
                     "reduce_only": reduce_only,
                 },
             }
@@ -152,7 +157,6 @@ class HyperliquidClient:
         if self.exchange is None:
             raise RuntimeError("当前客户端未初始化交易权限")
 
-        limit_px = px * (1 + slippage if is_buy else 1 - slippage)
         order_type = {"limit": {"tif": "Ioc"}}
         return self.exchange.order(coin, is_buy, sz, limit_px, order_type, reduce_only=reduce_only)
 
@@ -200,3 +204,23 @@ class HyperliquidClient:
             except (TypeError, ValueError):
                 continue
         return None
+
+    def _normalize_size(self, coin: str, size: float) -> float:
+        asset = self.info.name_to_asset(coin)
+        sz_decimals = self.info.asset_to_sz_decimals[asset]
+        quantum = Decimal("1").scaleb(-sz_decimals)
+        normalized = Decimal(str(size)).quantize(quantum, rounding=ROUND_DOWN)
+        return float(normalized)
+
+    def _normalize_price(self, coin: str, price: float) -> float:
+        asset = self.info.name_to_asset(coin)
+        sz_decimals = self.info.asset_to_sz_decimals[asset]
+        max_decimals = 6
+
+        if price > 100_000:
+            return float(round(price))
+
+        rounded_sig = float(f"{price:.5g}")
+        decimals = max(max_decimals - sz_decimals, 0)
+        normalized = round(rounded_sig, decimals)
+        return float(normalized)
