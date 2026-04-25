@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import logging
 import time
 from decimal import Decimal, ROUND_DOWN
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional, TypeVar
 
 from eth_account import Account
 
@@ -12,12 +13,17 @@ from hyperliquid.info import Info
 from hyperbot.models import PositionSnapshot
 
 
+T = TypeVar("T")
+
+
 class HyperliquidClient:
     STABLE_COINS = {"USDC", "USDT0", "USDE", "USDH", "USDT"}
 
     def __init__(self, api_url: str, private_key: Optional[str] = None):
         self.info = Info(api_url, skip_ws=True)
         self.exchange: Optional[Exchange] = None
+        self._request_retries = 3
+        self._request_retry_delay = 0.35
         if private_key:
             wallet = Account.from_key(private_key)
             self.exchange = Exchange(wallet, api_url)
@@ -32,13 +38,16 @@ class HyperliquidClient:
         return perp_value, spot_value, perp_value + spot_value
 
     def get_perp_account_value(self, address: str) -> float:
-        state = self.info.user_state(address)
+        state = self._with_retry("user_state", lambda: self.info.user_state(address))
         margin = state.get("marginSummary", {})
         return float(margin.get("accountValue", 0.0))
 
     def get_spot_account_value(self, address: str) -> float:
         try:
-            state = self.info.post("/info", {"type": "spotClearinghouseState", "user": address})
+            state = self._with_retry(
+                "spot_clearinghouse_state",
+                lambda: self.info.post("/info", {"type": "spotClearinghouseState", "user": address}),
+            )
         except Exception:
             return 0.0
 
@@ -52,7 +61,7 @@ class HyperliquidClient:
         return total
 
     def get_positions(self, address: str) -> Dict[str, PositionSnapshot]:
-        state = self.info.user_state(address)
+        state = self._with_retry("user_state", lambda: self.info.user_state(address))
         _, _, account_value = self.get_account_values(address)
         positions: Dict[str, PositionSnapshot] = {}
 
@@ -106,7 +115,7 @@ class HyperliquidClient:
         return positions
 
     def get_mid_price(self, coin: str) -> float:
-        mids = self.info.all_mids()
+        mids = self._with_retry("all_mids", self.info.all_mids)
         if coin not in mids:
             raise ValueError(f"未找到 {coin} 的中间价")
         return float(mids[coin])
@@ -178,7 +187,10 @@ class HyperliquidClient:
     def estimate_recent_closed_pnl(self, address: str, lookback_seconds: int = 180) -> Optional[float]:
         end_ms = int(time.time() * 1000)
         start_ms = end_ms - lookback_seconds * 1000
-        fills: List[Dict] = self.info.user_fills_by_time(address, start_ms, end_ms)
+        fills: List[Dict] = self._with_retry(
+            "user_fills_by_time",
+            lambda: self.info.user_fills_by_time(address, start_ms, end_ms),
+        )
 
         total = 0.0
         found = False
@@ -224,3 +236,25 @@ class HyperliquidClient:
         decimals = max(max_decimals - sz_decimals, 0)
         normalized = round(rounded_sig, decimals)
         return float(normalized)
+
+    def _with_retry(self, op_name: str, fn: Callable[[], T]) -> T:
+        last_error: Optional[Exception] = None
+        for attempt in range(1, self._request_retries + 1):
+            try:
+                return fn()
+            except Exception as exc:
+                last_error = exc
+                if attempt >= self._request_retries:
+                    break
+                sleep_seconds = self._request_retry_delay * attempt
+                logging.warning(
+                    "Hyperliquid API 调用失败，准备重试 op=%s attempt=%s/%s error=%s",
+                    op_name,
+                    attempt,
+                    self._request_retries,
+                    exc,
+                )
+                time.sleep(sleep_seconds)
+
+        assert last_error is not None
+        raise last_error

@@ -68,20 +68,22 @@ class FeishuNotifier:
         }
         self._send_payload(payload)
 
-    def _send_payload(self, payload: dict) -> None:
+    def _send_payload(self, payload: dict) -> bool:
         last_error: Optional[Exception] = None
         for idx in range(3):
             try:
                 resp = requests.post(self._webhook, json=payload, timeout=self._timeout)
                 resp.raise_for_status()
-                return
+                return True
             except Exception as exc:
                 last_error = exc
                 logging.warning("飞书推送失败，第 %s 次重试: %s", idx + 1, exc)
                 time.sleep(0.4)
 
         if last_error is not None:
-            raise last_error
+            # 飞书通知属于旁路能力，不应影响主交易流程
+            logging.error("飞书推送最终失败，已放弃本条消息: %s", last_error)
+        return False
 
     def send_leader_signal(self, action: PositionAction, snapshot: PositionSnapshot) -> None:
         ratio_pct = snapshot.principal_ratio * 100
