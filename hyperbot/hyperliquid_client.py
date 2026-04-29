@@ -20,13 +20,35 @@ class HyperliquidClient:
     STABLE_COINS = {"USDC", "USDT0", "USDE", "USDH", "USDT"}
 
     def __init__(self, api_url: str, private_key: Optional[str] = None):
-        self.info = Info(api_url, skip_ws=True)
+        # 先用基础 Info 获取所有 perp DEX（包含 HIP-3 等 builder-deployed DEX）
+        _boot = Info(api_url, skip_ws=True)
+        try:
+            raw_dexs = _boot.perp_dexs()
+            self._extra_dexs: List[str] = [
+                d["name"] for d in raw_dexs[1:] if isinstance(d, dict) and d.get("name")
+            ]
+        except Exception as exc:
+            logging.warning("无法获取 perp DEXs 列表，仅使用主 DEX: %s", exc)
+            self._extra_dexs = []
+
+        all_dex_names = [""] + self._extra_dexs
+        self.info = Info(
+            api_url,
+            skip_ws=True,
+            perp_dexs=all_dex_names if self._extra_dexs else None,
+        )
         self.exchange: Optional[Exchange] = None
         self._request_retries = 3
         self._request_retry_delay = 0.35
         if private_key:
             wallet = Account.from_key(private_key)
             self.exchange = Exchange(wallet, api_url)
+            # 让 exchange 的内部 info 也感知所有 DEX，以便下单时 name_to_asset 能查到 HIP-3 币种
+            self.exchange.info = self.info
+
+    @property
+    def extra_dexs(self) -> List[str]:
+        return list(self._extra_dexs)
 
     def get_account_value(self, address: str) -> float:
         _, _, total_value = self.get_account_values(address)
@@ -61,28 +83,38 @@ class HyperliquidClient:
         return total
 
     def get_positions(self, address: str) -> Dict[str, PositionSnapshot]:
-        state = self._with_retry("user_state", lambda: self.info.user_state(address))
         _, _, account_value = self.get_account_values(address)
-        positions: Dict[str, PositionSnapshot] = {}
+        # 主 DEX 仓位
+        state = self._with_retry("user_state", lambda: self.info.user_state(address))
+        positions = self._parse_positions_from_state(state, account_value)
+        # 额外 DEX 仓位（HIP-3 等）
+        for dex in self._extra_dexs:
+            try:
+                dex_state = self._with_retry(
+                    f"user_state_{dex}",
+                    lambda d=dex: self.info.user_state(address, dex=d),
+                )
+                positions.update(self._parse_positions_from_state(dex_state, account_value))
+            except Exception as exc:
+                logging.warning("获取 dex=%s 仓位失败: %s", dex, exc)
+        return positions
 
+    def _parse_positions_from_state(self, state: Dict, account_value: float) -> Dict[str, PositionSnapshot]:
+        positions: Dict[str, PositionSnapshot] = {}
         for item in state.get("assetPositions", []):
             pos = item.get("position", {})
             coin = pos.get("coin")
             if not coin:
                 continue
-
             size = float(pos.get("szi", 0.0))
             if size == 0:
                 continue
-
             notional = abs(float(pos.get("positionValue", 0.0)))
             if notional == 0:
                 entry_px = float(pos.get("entryPx", 0.0))
                 notional = abs(size * entry_px)
-
             leverage_raw = pos.get("leverage", {})
             leverage = float(leverage_raw.get("value", 1.0)) if isinstance(leverage_raw, dict) else float(leverage_raw)
-
             margin_mode = "cross"
             if isinstance(leverage_raw, dict):
                 if leverage_raw.get("type"):
@@ -91,16 +123,8 @@ class HyperliquidClient:
                 margin_mode = str(pos["marginMode"])
             if pos.get("marginType"):
                 margin_mode = str(pos["marginType"])
-
-            unrealized_pnl = self._first_float(
-                pos,
-                ["unrealizedPnl", "unrealizedPnlUsd", "uPnl", "upnl"],
-            )
-            liquidation_price = self._first_float(
-                pos,
-                ["liquidationPx", "liquidationPrice", "liqPx"],
-            )
-
+            unrealized_pnl = self._first_float(pos, ["unrealizedPnl", "unrealizedPnlUsd", "uPnl", "upnl"])
+            liquidation_price = self._first_float(pos, ["liquidationPx", "liquidationPrice", "liqPx"])
             positions[coin] = PositionSnapshot(
                 coin=coin,
                 size=size,
@@ -111,14 +135,21 @@ class HyperliquidClient:
                 unrealized_pnl_usd=unrealized_pnl,
                 liquidation_price=liquidation_price,
             )
-
         return positions
 
     def get_mid_price(self, coin: str) -> float:
         mids = self._with_retry("all_mids", self.info.all_mids)
-        if coin not in mids:
-            raise ValueError(f"未找到 {coin} 的中间价")
-        return float(mids[coin])
+        if coin in mids:
+            return float(mids[coin])
+        # 主 DEX 未找到时，依次尝试额外 DEX（HIP-3 等）
+        for dex in self._extra_dexs:
+            try:
+                dex_mids = self._with_retry(f"all_mids_{dex}", lambda d=dex: self.info.all_mids(dex=d))
+                if coin in dex_mids:
+                    return float(dex_mids[coin])
+            except Exception as exc:
+                logging.warning("获取 dex=%s 价格失败: %s", dex, exc)
+        raise ValueError(f"未找到 {coin} 的中间价")
 
     def configure_leverage_and_mode(self, coin: str, leverage: float, margin_mode: str, dry_run: bool) -> None:
         if dry_run:

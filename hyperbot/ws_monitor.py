@@ -4,17 +4,24 @@ import json
 import logging
 import threading
 import time
-from typing import Callable
+from typing import Callable, List, Optional
 from urllib.parse import urlparse
 
 from websocket import WebSocketApp
 
 
 class LeaderWsMonitor:
-    def __init__(self, api_url: str, leader_address: str, reconnect_seconds: float = 3.0):
+    def __init__(
+        self,
+        api_url: str,
+        leader_address: str,
+        reconnect_seconds: float = 3.0,
+        extra_dexs: Optional[List[str]] = None,
+    ):
         self.api_url = api_url
         self.leader_address = leader_address
         self.reconnect_seconds = reconnect_seconds
+        self.extra_dexs: List[str] = extra_dexs or []
         self._stop_event = threading.Event()
 
     def start_forever(self, on_event: Callable[[], None]) -> None:
@@ -50,9 +57,13 @@ class LeaderWsMonitor:
             {"type": "clearinghouseState", "user": self.leader_address},
             {"type": "userEvents", "user": self.leader_address},
         ]
+        # 为每个额外 DEX（HIP-3 等）单独订阅 clearinghouseState
+        for dex in self.extra_dexs:
+            subs.append({"type": "clearinghouseState", "user": self.leader_address, "dex": dex})
         for sub in subs:
             ws.send(json.dumps({"method": "subscribe", "subscription": sub}))
-        logging.info("WebSocket 已连接并订阅 leader 地址事件")
+        dex_info = f" + extra DEXs: {self.extra_dexs}" if self.extra_dexs else ""
+        logging.info("WebSocket 已连接并订阅 leader 地址事件%s", dex_info)
 
     def _on_message(self, raw_msg: str, on_event: Callable[[], None]) -> None:
         try:

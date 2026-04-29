@@ -36,6 +36,7 @@ def main() -> None:
         api_url=settings.api_url,
         leader_address=settings.leader_address,
         reconnect_seconds=settings.ws_reconnect_seconds,
+        extra_dexs=leader_client.extra_dexs,
     )
 
     logging.info("Hyperliquid WS 跟单系统已启动, dry_run=%s", settings.dry_run)
