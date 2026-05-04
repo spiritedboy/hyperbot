@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Dict, Optional
 
 from hyperbot.config import Settings
-from hyperbot.feishu import FeishuNotifier
+from hyperbot.dingtalk import DingTalkNotifier
 from hyperbot.hyperliquid_client import HyperliquidClient
 from hyperbot.models import PositionAction, PositionSnapshot
 
@@ -24,7 +24,7 @@ class CopyTradingEngine:
         settings: Settings,
         leader_client: HyperliquidClient,
         follower_client: HyperliquidClient,
-        notifier: FeishuNotifier,
+        notifier: DingTalkNotifier,
     ):
         self.settings = settings
         self.leader_client = leader_client

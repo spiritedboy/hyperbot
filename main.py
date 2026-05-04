@@ -6,7 +6,7 @@ from eth_account import Account
 
 from hyperbot.config import load_settings
 from hyperbot.copier import CopyTradingEngine
-from hyperbot.feishu import FeishuNotifier
+from hyperbot.dingtalk import DingTalkNotifier
 from hyperbot.hyperliquid_client import HyperliquidClient
 from hyperbot.ws_monitor import LeaderWsMonitor
 
@@ -28,7 +28,7 @@ def main() -> None:
         api_url=settings.api_url,
         private_key=settings.follower_private_key,
     )
-    notifier = FeishuNotifier(settings.feishu_webhook)
+    notifier = DingTalkNotifier(settings.dingtalk_webhook)
 
     engine = CopyTradingEngine(settings, leader_client, follower_client, notifier)
     engine.bootstrap()

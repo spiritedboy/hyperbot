@@ -10,7 +10,7 @@ class Settings:
     leader_address: str
     follower_private_key: str
     follower_address: str
-    feishu_webhook: str
+    dingtalk_webhook: str
     fixed_margin_usd: float
     ws_reconnect_seconds: float
     market_slippage: float
@@ -37,7 +37,7 @@ def load_settings() -> Settings:
     leader_address = os.getenv("LEADER_ADDRESS", "").strip()
     follower_private_key = os.getenv("FOLLOWER_PRIVATE_KEY", "").strip()
     follower_address = os.getenv("FOLLOWER_ADDRESS", "").strip()
-    feishu_webhook = os.getenv("FEISHU_WEBHOOK", "").strip()
+    dingtalk_webhook = os.getenv("DINGTALK_WEBHOOK", "").strip()
 
     if not leader_address:
         raise ValueError("LEADER_ADDRESS 未配置")
@@ -45,8 +45,8 @@ def load_settings() -> Settings:
         raise ValueError("FOLLOWER_PRIVATE_KEY 未配置")
     if not follower_address:
         raise ValueError("FOLLOWER_ADDRESS 未配置")
-    if not feishu_webhook:
-        raise ValueError("FEISHU_WEBHOOK 未配置")
+    if not dingtalk_webhook:
+        raise ValueError("DINGTALK_WEBHOOK 未配置")
 
     fixed_margin_usd = float(os.getenv("FIXED_MARGIN_USD", "20"))
     ws_reconnect_seconds = float(os.getenv("WS_RECONNECT_SECONDS", "3"))
@@ -65,7 +65,7 @@ def load_settings() -> Settings:
         leader_address=leader_address,
         follower_private_key=follower_private_key,
         follower_address=follower_address,
-        feishu_webhook=feishu_webhook,
+        dingtalk_webhook=dingtalk_webhook,
         fixed_margin_usd=fixed_margin_usd,
         ws_reconnect_seconds=ws_reconnect_seconds,
         market_slippage=market_slippage,
