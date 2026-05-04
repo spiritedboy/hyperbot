@@ -28,8 +28,8 @@ _HYPERLIQUID_TRADER_URL = "https://app.hyperliquid.xyz/trade"
 
 
 def _addr_url(address: str) -> str:
-    """生成 Hyperliquid 持仓页链接（按地址过滤）"""
-    return f"https://app.hyperliquid.xyz/portfolio?address={address}"
+    """生成 HyperBot trader 页链接"""
+    return f"https://hyperbot.network/trader/{address}"
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -273,6 +273,7 @@ class DingTalkNotifier:
         mode = kv.get("仓位模式", "")
         lev = kv.get("杠杆", "").rstrip("x")
         notional = kv.get("仓位面额", kv.get("面额", ""))
+        principal = kv.get("本金", "")
         entry = kv.get("开仓价", "")
         pnl = kv.get("当前盈亏", kv.get("浮动盈亏", ""))
         liq = kv.get("爆仓价", "")
@@ -282,6 +283,8 @@ class DingTalkNotifier:
             parts_out.append(f"`{mode} {lev}x`")
         if notional:
             parts_out.append(f"面额 {notional}")
+        if principal:
+            parts_out.append(f"本金 {principal}")
         if entry:
             parts_out.append(f"开仓 {entry}")
         if pnl:
