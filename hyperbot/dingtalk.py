@@ -275,6 +275,7 @@ class DingTalkNotifier:
         notional = kv.get("仓位面额", kv.get("面额", ""))
         principal = kv.get("本金", "")
         entry = kv.get("开仓价", "")
+        mid = kv.get("当前价", "")
         pnl = kv.get("当前盈亏", kv.get("浮动盈亏", ""))
         liq = kv.get("爆仓价", "")
 
@@ -287,6 +288,8 @@ class DingTalkNotifier:
             parts_out.append(f"本金 {principal}")
         if entry:
             parts_out.append(f"开仓 {entry}")
+        if mid:
+            parts_out.append(f"现价 {mid}")
         if pnl:
             parts_out.append(f"盈亏 {pnl}")
         if liq:

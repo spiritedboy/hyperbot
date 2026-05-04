@@ -70,8 +70,8 @@ class CopyTradingEngine:
         leader_principal = self._sum_principal(leader_positions)
         follower_principal = self._sum_principal(follower_positions)
 
-        leader_positions_text = self._format_positions(leader_positions)
-        follower_positions_text = self._format_positions(follower_positions)
+        leader_positions_text = self._format_positions(leader_positions, self.leader_client)
+        follower_positions_text = self._format_positions(follower_positions, self.follower_client)
 
         return (
             f"监控地址: {self.settings.leader_address}\n"
@@ -91,8 +91,7 @@ class CopyTradingEngine:
             f"模式: {'DRY_RUN' if self.settings.dry_run else 'LIVE'}"
         )
 
-    @staticmethod
-    def _format_positions(positions: Dict[str, PositionSnapshot]) -> str:
+    def _format_positions(self, positions: Dict[str, PositionSnapshot], client) -> str:
         if not positions:
             return "- 无持仓"
 
@@ -104,11 +103,16 @@ class CopyTradingEngine:
             pnl_text = "未知" if pos.unrealized_pnl_usd is None else f"{pos.unrealized_pnl_usd:.4f}U"
             liq_text = "未知" if pos.liquidation_price is None else f"{pos.liquidation_price:.6f}"
             entry_text = "未知" if pos.entry_price is None else f"{pos.entry_price:.4f}"
+            try:
+                mid = client.get_mid_price(coin)
+                mid_text = f"{mid:.4f}"
+            except Exception:
+                mid_text = "未知"
             rows.append(
                 (
                     f"- {coin} {direction} | 仓位模式={margin_mode} | 杠杆={pos.leverage:.2f}x | "
                     f"仓位面额={abs(pos.notional_usd):.4f}U | 本金={pos.principal_usd:.4f}U | "
-                    f"本金占比={pos.principal_ratio * 100:.2f}% | 开仓价={entry_text} | 当前盈亏={pnl_text} | 爆仓价={liq_text}"
+                    f"本金占比={pos.principal_ratio * 100:.2f}% | 开仓价={entry_text} | 当前价={mid_text} | 当前盈亏={pnl_text} | 爆仓价={liq_text}"
                 )
             )
         return "\n".join(rows)
