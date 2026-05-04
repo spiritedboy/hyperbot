@@ -21,6 +21,7 @@ class PositionSnapshot:
     account_value: float
     unrealized_pnl_usd: Optional[float] = None
     liquidation_price: Optional[float] = None
+    entry_price: Optional[float] = None
 
     @property
     def direction(self) -> str:

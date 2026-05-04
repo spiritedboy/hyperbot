@@ -103,11 +103,12 @@ class CopyTradingEngine:
             margin_mode = "全仓" if str(pos.margin_mode).lower() == "cross" else "逐仓"
             pnl_text = "未知" if pos.unrealized_pnl_usd is None else f"{pos.unrealized_pnl_usd:.4f}U"
             liq_text = "未知" if pos.liquidation_price is None else f"{pos.liquidation_price:.6f}"
+            entry_text = "未知" if pos.entry_price is None else f"{pos.entry_price:.4f}"
             rows.append(
                 (
                     f"- {coin} {direction} | 仓位模式={margin_mode} | 杠杆={pos.leverage:.2f}x | "
                     f"仓位面额={abs(pos.notional_usd):.4f}U | 本金={pos.principal_usd:.4f}U | "
-                    f"本金占比={pos.principal_ratio * 100:.2f}% | 当前盈亏={pnl_text} | 爆仓价={liq_text}"
+                    f"本金占比={pos.principal_ratio * 100:.2f}% | 开仓价={entry_text} | 当前盈亏={pnl_text} | 爆仓价={liq_text}"
                 )
             )
         return "\n".join(rows)
@@ -226,6 +227,7 @@ class CopyTradingEngine:
             margin_mode=margin_mode,
             dry_run=self.settings.dry_run,
         )
+        entry_px = self.follower_client.get_mid_price(leader_pos.coin)
         self.follower_client.market_order(
             coin=leader_pos.coin,
             is_buy=is_buy,
@@ -242,6 +244,7 @@ class CopyTradingEngine:
             leverage=leverage,
             principal_usd=principal,
             executed_notional_usd=notional,
+            entry_price=entry_px,
             dry_run=self.settings.dry_run,
         )
 
@@ -283,6 +286,7 @@ class CopyTradingEngine:
         if follower_pos is None:
             return
 
+        close_px = self.follower_client.get_mid_price(coin)
         self.follower_client.close_position_market(
             coin=coin,
             size=follower_pos.size,
@@ -303,6 +307,8 @@ class CopyTradingEngine:
             principal_usd=self.settings.fixed_margin_usd,
             executed_notional_usd=abs(follower_pos.notional_usd),
             pnl_usd=pnl,
+            entry_price=follower_pos.entry_price,
+            close_price=close_px,
             dry_run=self.settings.dry_run,
         )
 

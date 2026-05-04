@@ -110,8 +110,8 @@ class HyperliquidClient:
             if size == 0:
                 continue
             notional = abs(float(pos.get("positionValue", 0.0)))
+            entry_px = float(pos.get("entryPx", 0.0))
             if notional == 0:
-                entry_px = float(pos.get("entryPx", 0.0))
                 notional = abs(size * entry_px)
             leverage_raw = pos.get("leverage", {})
             leverage = float(leverage_raw.get("value", 1.0)) if isinstance(leverage_raw, dict) else float(leverage_raw)
@@ -134,6 +134,7 @@ class HyperliquidClient:
                 account_value=account_value,
                 unrealized_pnl_usd=unrealized_pnl,
                 liquidation_price=liquidation_price,
+                entry_price=entry_px if entry_px > 0 else None,
             )
         return positions
 

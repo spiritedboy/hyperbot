@@ -87,6 +87,11 @@ class DingTalkNotifier:
             if snapshot.liquidation_price is None
             else f"{snapshot.liquidation_price:.4f}"
         )
+        entry_text = (
+            "—"
+            if snapshot.entry_price is None
+            else f"{snapshot.entry_price:.4f}"
+        )
         ratio_pct = snapshot.principal_ratio * 100
         now = datetime.now().strftime("%H:%M:%S")
 
@@ -96,7 +101,7 @@ class DingTalkNotifier:
             f"**{snapshot.coin}** &nbsp; {direction} &nbsp; `{margin_mode} {snapshot.leverage:.0f}x` &nbsp; _{now}_\n\n"
             f"> 本金 **{snapshot.principal_usd:.2f} U** &nbsp;｜&nbsp; 面额 {abs(snapshot.notional_usd):.2f} U  \n"
             f"> 本金占比 {ratio_pct:.2f}% &nbsp;｜&nbsp; 浮盈 **{pnl_text}**  \n"
-            f"> 爆仓价 {liq_text}"
+            f"> 开仓价 {entry_text} &nbsp;｜&nbsp; 爆仓价 {liq_text}"
         )
         self._send_markdown(f"监控信号 · {snapshot.coin} {action_cn}", md)
 
@@ -110,6 +115,8 @@ class DingTalkNotifier:
         principal_usd: float,
         executed_notional_usd: float,
         pnl_usd: Optional[float] = None,
+        entry_price: Optional[float] = None,
+        close_price: Optional[float] = None,
         dry_run: bool = False,
     ) -> None:
         """以 Markdown 发送跟单执行结果。"""
@@ -122,13 +129,21 @@ class DingTalkNotifier:
         pnl_line = ""
         if pnl_usd is not None:
             pnl_sign = "+" if pnl_usd >= 0 else ""
-            pnl_line = f"> 平仓盈亏 **{pnl_sign}{pnl_usd:.4f} U**\n\n"
+            pnl_line = f"> 平仓盈亏 **{pnl_sign}{pnl_usd:.4f} U**  \n"
+
+        price_parts = []
+        if entry_price is not None:
+            price_parts.append(f"开仓价 **{entry_price:.4f}**")
+        if close_price is not None:
+            price_parts.append(f"平仓价 **{close_price:.4f}**")
+        price_line = (f"> {'　｜　'.join(price_parts)}  \n") if price_parts else ""
 
         md = (
             f"## ✅ 跟单结果 · {action_cn}\n\n"
             f"---\n\n"
             f"**{coin}** &nbsp; {dir_text} &nbsp; `{mode_text} {leverage:.0f}x` &nbsp; {run_badge} &nbsp; _{now}_\n\n"
             f"> 本金 **{principal_usd:.2f} U** &nbsp;｜&nbsp; 面额 {executed_notional_usd:.2f} U  \n"
+            f"{price_line}"
             f"{pnl_line}"
         )
         self._send_markdown(f"跟单结果 · {coin} {action_cn}", md)
@@ -258,6 +273,7 @@ class DingTalkNotifier:
         mode = kv.get("仓位模式", "")
         lev = kv.get("杠杆", "").rstrip("x")
         notional = kv.get("仓位面额", kv.get("面额", ""))
+        entry = kv.get("开仓价", "")
         pnl = kv.get("当前盈亏", kv.get("浮动盈亏", ""))
         liq = kv.get("爆仓价", "")
 
@@ -266,6 +282,8 @@ class DingTalkNotifier:
             parts_out.append(f"`{mode} {lev}x`")
         if notional:
             parts_out.append(f"面额 {notional}")
+        if entry:
+            parts_out.append(f"开仓 {entry}")
         if pnl:
             parts_out.append(f"盈亏 {pnl}")
         if liq:
