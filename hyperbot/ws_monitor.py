@@ -37,8 +37,10 @@ class LeaderWsMonitor:
             )
 
             try:
-                # ping 让连接更稳定，断开后自动回到 while 做重连
-                app.run_forever(ping_interval=20, ping_timeout=10)
+                # 禁用客户端主动 ping：Hyperliquid 服务端对 WS ping frame 响应不稳定，
+                # 开启后约每 50s 因 pong 超时误断一次。由服务端推送消息维持连接活跃，
+                # 真实断连会触发 on_error/on_close，仍会触发重连逻辑。
+                app.run_forever(ping_interval=0)
             except Exception as exc:
                 logging.exception("WebSocket run_forever 异常: %s", exc)
 

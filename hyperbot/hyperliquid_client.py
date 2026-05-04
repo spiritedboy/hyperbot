@@ -9,6 +9,10 @@ from eth_account import Account
 
 from hyperliquid.exchange import Exchange
 from hyperliquid.info import Info
+try:
+    from hyperliquid.utils.error import ClientError as _HLClientError
+except ImportError:
+    _HLClientError = None  # type: ignore
 
 from hyperbot.models import PositionSnapshot
 
@@ -40,6 +44,9 @@ class HyperliquidClient:
         self.exchange: Optional[Exchange] = None
         self._request_retries = 3
         self._request_retry_delay = 0.35
+        # 仓位缓存：减少高频 tick 对 API 的冲击，TTL 2 秒
+        self._positions_cache: Dict[str, tuple] = {}
+        self._positions_cache_ttl: float = 2.0
         if private_key:
             wallet = Account.from_key(private_key)
             self.exchange = Exchange(wallet, api_url)
@@ -83,6 +90,13 @@ class HyperliquidClient:
         return total
 
     def get_positions(self, address: str) -> Dict[str, PositionSnapshot]:
+        # TTL 缓存：2 秒内重复调用直接返回上次结果，避免高频 tick 触发 429
+        cached = self._positions_cache.get(address)
+        if cached is not None:
+            cached_ts, cached_pos = cached
+            if time.monotonic() - cached_ts < self._positions_cache_ttl:
+                return cached_pos
+
         _, _, account_value = self.get_account_values(address)
         # 主 DEX 仓位
         state = self._with_retry("user_state", lambda: self.info.user_state(address))
@@ -97,6 +111,8 @@ class HyperliquidClient:
                 positions.update(self._parse_positions_from_state(dex_state, account_value))
             except Exception as exc:
                 logging.warning("获取 dex=%s 仓位失败: %s", dex, exc)
+
+        self._positions_cache[address] = (time.monotonic(), positions)
         return positions
 
     def _parse_positions_from_state(self, state: Dict, account_value: float) -> Dict[str, PositionSnapshot]:
@@ -278,7 +294,13 @@ class HyperliquidClient:
                 last_error = exc
                 if attempt >= self._request_retries:
                     break
-                sleep_seconds = self._request_retry_delay * attempt
+                # 429 限流：指数退避（1s, 2s），其余线性退避（0.35s, 0.7s）
+                is_rate_limit = (
+                    _HLClientError is not None
+                    and isinstance(exc, _HLClientError)
+                    and getattr(exc, "status_code", None) == 429
+                )
+                sleep_seconds = (2 ** (attempt - 1)) if is_rate_limit else (self._request_retry_delay * attempt)
                 logging.warning(
                     "Hyperliquid API 调用失败，准备重试 op=%s attempt=%s/%s error=%s",
                     op_name,
